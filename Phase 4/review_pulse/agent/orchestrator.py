@@ -99,9 +99,30 @@ class Orchestrator:
             )
 
             # -------------------------------------------------------------------
-            # Phase 5: RENDERING + DELIVERY (→ implemented in Phase 4)
+            # Phase 5: RENDERING + DELIVERY
             # -------------------------------------------------------------------
-            logger.info("🏜️  Phase 3 milestone — delivery deferred to Phase 4")
+            if not dry_run:
+                logger.info("📄 [Phase 4] Creating Google Doc report...")
+                from review_pulse.delivery.google_docs import create_google_doc
+                from review_pulse.delivery.gmail import send_gmail_notification
+
+                doc_id = create_google_doc(product, iso_week, analysis)
+                await self.run_log.update_run(
+                    record.id,
+                    doc_id=doc_id,
+                    doc_heading=f"Review Pulse — {product.title()} — {iso_week}",
+                )
+
+                # Send Gmail notification
+                logger.info("📧 [Phase 4] Sending Gmail notification...")
+                recipients = product_config.stakeholder_emails
+                msg_id = send_gmail_notification(
+                    product, iso_week, analysis, recipients, doc_id
+                )
+                if msg_id:
+                    await self.run_log.update_run(record.id, gmail_msg_id=msg_id)
+            else:
+                logger.info("🏜️  Dry run — skipping delivery")
 
             status = "dry_run" if dry_run else "success"
             await self.run_log.update_run(record.id, status=status, completed_at=datetime.utcnow())

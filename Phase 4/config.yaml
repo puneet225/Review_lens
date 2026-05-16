@@ -1,0 +1,33 @@
+# Review Pulse — Phase 2 Configuration (Groww focused)
+
+products:
+  - name: groww
+    appstore_id: "1404684442"
+    playstore_id: "com.nextbillion.groww"
+    doc_title: "Weekly Review Pulse — Groww"
+    stakeholder_emails:
+      - 225puneet@gmail.com
+
+ingestion:
+  window_weeks: 12
+  max_reviews_per_source: 5000
+
+analysis:
+  embedding_model: "all-MiniLM-L6-v2"
+  umap_n_components: 15
+  umap_n_neighbors: 20
+  umap_min_dist: 0.0
+  umap_metric: "cosine"
+  hdbscan_min_cluster_size: 5
+  hdbscan_min_samples: 3
+  llm_model: "gemini-2.0-flash-lite"
+  max_tokens_per_run: 50000
+  max_themes: 10
+
+delivery:
+  mode: "draft"
+  mcp_config_path: "./mcp_servers.json"
+
+schedule:
+  cron: "0 8 * * MON"
+  timezone: "Asia/Kolkata"

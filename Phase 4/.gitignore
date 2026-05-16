@@ -1,0 +1,34 @@
+# Dependencies
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Data / runtime
+data/*.db
+*.sqlite3
+
+# Credentials — NEVER commit
+*.credentials.json
+*token.json
+*oauth*.json
+.env
+.env.*
+mcp_servers.json
+
+# OS
+.DS_Store
+Thumbs.db

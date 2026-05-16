@@ -1,0 +1,18 @@
+{
+  "google_docs": {
+    "command": "npx",
+    "args": ["-y", "@anthropic/google-docs-mcp-server"],
+    "env": {
+      "GOOGLE_OAUTH_CREDENTIALS_PATH": "/path/to/your/gcp_oauth.json",
+      "GOOGLE_OAUTH_TOKEN_PATH": "/path/to/your/gcp_token.json"
+    }
+  },
+  "gmail": {
+    "command": "npx",
+    "args": ["-y", "@anthropic/gmail-mcp-server"],
+    "env": {
+      "GOOGLE_OAUTH_CREDENTIALS_PATH": "/path/to/your/gcp_oauth.json",
+      "GOOGLE_OAUTH_TOKEN_PATH": "/path/to/your/gcp_token.json"
+    }
+  }
+}
