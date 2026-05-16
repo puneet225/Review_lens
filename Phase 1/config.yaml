@@ -1,0 +1,62 @@
+# Review Pulse — Configuration
+# Copy this file to config.yaml and customise.
+
+products:
+  - name: groww
+    appstore_id: "1404684442"
+    playstore_id: "com.nextbillion.groww"
+    doc_title: "Weekly Review Pulse — Groww"
+    stakeholder_emails:
+      - product-team@company.com
+
+  - name: indmoney
+    appstore_id: "1459299912"
+    playstore_id: "in.indmoney"
+    doc_title: "Weekly Review Pulse — INDMoney"
+    stakeholder_emails:
+      - product-team@company.com
+
+  - name: kuvera
+    appstore_id: "1444aborea"
+    playstore_id: "com.kuvera.app"
+    doc_title: "Weekly Review Pulse — Kuvera"
+    stakeholder_emails:
+      - product-team@company.com
+
+  - name: powerup_money
+    appstore_id: "1600000001"
+    playstore_id: "com.powerupmoney.app"
+    doc_title: "Weekly Review Pulse — PowerUp Money"
+    stakeholder_emails:
+      - product-team@company.com
+
+  - name: wealth_monitor
+    appstore_id: "1600000002"
+    playstore_id: "com.wealthmonitor.app"
+    doc_title: "Weekly Review Pulse — Wealth Monitor"
+    stakeholder_emails:
+      - product-team@company.com
+
+ingestion:
+  window_weeks: 12
+  max_reviews_per_source: 500
+
+analysis:
+  embedding_model: "all-MiniLM-L6-v2"
+  umap_n_components: 15
+  umap_n_neighbors: 20
+  umap_min_dist: 0.0
+  umap_metric: "cosine"
+  hdbscan_min_cluster_size: 5
+  hdbscan_min_samples: 3
+  llm_model: "gemini-2.5-flash"
+  max_tokens_per_run: 50000
+  max_themes: 8
+
+delivery:
+  mode: "draft"
+  mcp_config_path: "./mcp_servers.json"
+
+schedule:
+  cron: "0 8 * * MON"
+  timezone: "Asia/Kolkata"

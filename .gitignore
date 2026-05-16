@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Secrets — NEVER commit these
+gcp_token.json
+gcp_oauth.json
+
+# Data / DB
+Phase\ 3/data/
+*.db
+*.sqlite
+
+# Next.js
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+frontend/.env*.local
+
+# macOS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE
+.vscode/
+.idea/
+
+# MCP servers
+mcp_servers.json

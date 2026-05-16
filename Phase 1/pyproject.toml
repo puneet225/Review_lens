@@ -1,0 +1,80 @@
+[project]
+name = "review-pulse"
+version = "0.1.0"
+description = "Weekly Product Review Pulse — AI agent that clusters app store reviews and delivers reports via MCP"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+
+dependencies = [
+    # CLI & Scheduling
+    "click>=8.1",
+    "apscheduler>=3.10",
+
+    # Data models & config
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pyyaml>=6.0",
+
+    # Ingestion
+    "google-play-scraper>=1.2",
+    "app-store-web-scraper>=0.3",
+    "requests>=2.31",
+
+    # PII scrubbing
+    "presidio-analyzer>=2.2",
+    "presidio-anonymizer>=2.2",
+
+    # Analysis
+    "sentence-transformers>=2.2",
+    "umap-learn>=0.5",
+    "hdbscan>=0.8",
+    "numpy>=1.24",
+    "scikit-learn>=1.3",
+
+    # LLM
+    "google-genai>=1.0",
+
+    # Rendering
+    "jinja2>=3.1",
+
+    # MCP
+    "mcp>=1.0",
+
+    # Audit store
+    "aiosqlite>=0.19",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=4.1",
+    "ruff>=0.3",
+    "mypy>=1.8",
+]
+
+[project.scripts]
+review-pulse = "review_pulse.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests requiring network/external services",
+    "e2e: marks end-to-end tests requiring full setup",
+]
