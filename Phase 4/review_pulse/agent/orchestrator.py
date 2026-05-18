@@ -80,7 +80,7 @@ class Orchestrator:
             # Phase 3: ANALYSIS
             # -------------------------------------------------------------------
             logger.info("🔬 [Phase 3] Analysis — clustering %d reviews", len(reviews))
-            analysis: AnalysisResult = run_analysis(reviews, self.config.analysis)
+            analysis: AnalysisResult = run_analysis(reviews, self.config.analysis, product=product)
             # Store for API access
             self._last_analysis = analysis
             self._last_review_count = len(reviews)

@@ -42,3 +42,7 @@ npm-debug.log*
 
 # MCP servers
 mcp_servers.json
+
+# SQLite WAL artifacts
+*.db-shm
+*.db-wal

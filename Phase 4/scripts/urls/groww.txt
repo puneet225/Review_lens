@@ -1,0 +1,6 @@
+# Groww knowledge-base source URLs.
+# One URL per line, '#' for comments.
+# Refresh by running: python scripts/scrape_groww.py --url-file scripts/urls/groww.txt
+https://groww.in/blog/mutual-fund-fees-and-charges
+https://groww.in/pricing/futures-and-options
+https://groww.in/pricing/stocks

@@ -20,10 +20,14 @@ from review_pulse.store.models import AnalysisResult
 
 logger = logging.getLogger(__name__)
 
-# Required scopes
+# Declare the FULL set of scopes the app uses, not just docs/drive. See the
+# matching comment in gmail.py — narrowing scopes in one delivery file would
+# narrow gcp_token.json on refresh and break the other surface.
 SCOPES = [
     "https://www.googleapis.com/auth/documents",
     "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.compose",
 ]
 
 
@@ -77,23 +81,39 @@ def _build_document_body(
     for i, theme in reversed(list(enumerate(analysis.themes, 1))):
         # Divider at the end of each theme
         blocks.append({"text": "\n" + "─" * 40 + "\n\n", "style": "NORMAL_TEXT"})
-        
+
+        # Fee Explainer (rendered LAST visually = added first to reverse list)
+        fe = theme.fee_explainer
+        if fe:
+            stale_tag = "  ⚠ Verify before sharing — facts are >90 days old" if fe.is_stale else ""
+            blocks.append({
+                "text": f"Last checked: {fe.last_checked.isoformat()}{stale_tag}\n",
+                "style": "NORMAL_TEXT",
+            })
+            for url in reversed(fe.source_urls):
+                blocks.append({"text": f"  • {url}\n", "style": "NORMAL_TEXT"})
+            blocks.append({"text": "Official sources:\n", "style": "NORMAL_TEXT"})
+            for bullet in reversed(fe.bullets):
+                blocks.append({"text": f"  • {bullet}\n", "style": "NORMAL_TEXT"})
+            blocks.append({"text": f"🛈 Fee Facts — {fe.title}\n", "style": "HEADING_3"})
+
         # Action
         if theme.action:
             blocks.append({"text": f"✅ Recommended Action: {theme.action}\n", "style": "NORMAL_TEXT"})
-            
+
         # Quotes
         if theme.quotes:
             for q in reversed(theme.quotes):
                 blocks.append({"text": f"  • \"{q.text}\" — ★{q.rating} ({q.store})\n", "style": "NORMAL_TEXT"})
             blocks.append({"text": "💬 Supporting Quotes:\n", "style": "HEADING_3"})
 
-        # Review count
-        blocks.append({"text": f"📊 Reviews in cluster: {theme.review_count}\n", "style": "NORMAL_TEXT"})
-        
+        # Review count + sentiment
+        sentiment_str = f" | Sentiment: {theme.sentiment}" if theme.sentiment else ""
+        blocks.append({"text": f"📊 Reviews in cluster: {theme.review_count}{sentiment_str}\n", "style": "NORMAL_TEXT"})
+
         # Description
         blocks.append({"text": f"{theme.description}\n", "style": "NORMAL_TEXT"})
-        
+
         # Theme heading
         blocks.append({"text": f"Theme {i}: {theme.name}\n", "style": "HEADING_2"})
 

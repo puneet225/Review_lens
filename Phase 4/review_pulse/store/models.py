@@ -10,11 +10,11 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal, Optional, List, Union
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import AnyHttpUrl, BaseModel, Field, field_validator, model_validator
 
 
 # ---------------------------------------------------------------------------
@@ -86,14 +86,34 @@ class ValidatedQuote(BaseModel):
     rating: int = Field(..., ge=1, le=5)
 
 
+Sentiment = Literal["POSITIVE", "NEGATIVE", "MIXED", "NEUTRAL"]
+
+
+class FeeExplainer(BaseModel):
+    """Curated fact card attached to themes that match a known fee/charges topic.
+
+    Bullets and source URLs come from the curated YAML in data/fee_facts/{product}.yaml.
+    The LLM never generates these — it only picks the matching topic_id.
+    """
+
+    topic_id: str = Field(..., description="Matching topic_id from the fee_facts YAML")
+    title: str = Field(..., description="Fact card title from YAML")
+    bullets: List[str] = Field(..., min_length=1, max_length=6, description="≤6 neutral facts")
+    source_urls: List[AnyHttpUrl] = Field(..., min_length=1, max_length=3, description="1–3 official sources (target: 2)")
+    last_checked: date = Field(..., description="When the curator last verified the facts")
+    is_stale: bool = Field(False, description="True if last_checked is older than 90 days")
+
+
 class Theme(BaseModel):
     """A named cluster theme with supporting evidence."""
 
     name: str = Field(..., min_length=1, max_length=60, description="Short theme name (≤6 words)")
     description: str = Field("", description="One-line theme description")
+    sentiment: Optional[Sentiment] = Field(None, description="POSITIVE/NEGATIVE/MIXED/NEUTRAL")
     quotes: List[ValidatedQuote] = Field(default_factory=list, description="2–3 validated quotes")
-    action: str = Field("", description="One actionable recommendation")
+    action: Optional[str] = Field(None, description="One actionable recommendation, or None for NEUTRAL clusters")
     review_count: int = Field(0, ge=0, description="Number of reviews in this cluster")
+    fee_explainer: Optional[FeeExplainer] = Field(None, description="Attached when theme matches a curated fee topic")
 
 
 class AnalysisResult(BaseModel):

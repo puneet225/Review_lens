@@ -5,12 +5,21 @@ import { useState, useEffect, useRef } from 'react'
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 type Quote = { text: string; rating: number; store: string }
+type FeeExplainer = {
+  title: string
+  bullets: string[]
+  source_urls: string[]
+  last_checked: string
+  is_stale: boolean
+}
 type Theme = {
   name: string
   description: string
+  sentiment?: 'POSITIVE' | 'NEGATIVE' | 'MIXED' | 'NEUTRAL' | null
   review_count: number
-  action: string
+  action: string | null
   quotes: Quote[]
+  fee_explainer?: FeeExplainer | null
 }
 type Job = {
   job_id: string
@@ -20,15 +29,7 @@ type Job = {
   error?: string
 }
 
-const WEEK_OPTIONS = [
-  { label: '1 Week', value: 1 },
-  { label: '2 Weeks', value: 2 },
-  { label: '3 Weeks', value: 3 },
-  { label: '4 Weeks', value: 4 },
-  { label: '6 Weeks', value: 6 },
-  { label: '8 Weeks', value: 8 },
-  { label: '12 Weeks', value: 12 },
-]
+const WEEK_PRESETS = [1, 4, 12, 26]
 
 const STAR_COLORS: Record<number, string> = {
   1: '#ef4444', 2: '#f97316', 3: '#f59e0b', 4: '#84cc16', 5: '#10b981'
@@ -214,25 +215,47 @@ export default function Home() {
 
             {/* Date Range */}
             <div style={{ marginBottom: 32 }}>
-              <label style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500, display: 'block', marginBottom: 10 }}>
-                Date Range (from today)
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                {WEEK_OPTIONS.map(opt => (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+                <label style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500 }}>
+                  Date Range (from today)
+                </label>
+                <span style={{
+                  fontSize: 13, fontWeight: 700, color: '#6366f1',
+                  background: '#6366f115', padding: '2px 8px', borderRadius: 6,
+                }}>
+                  {weeks} week{weeks > 1 ? 's' : ''}
+                </span>
+              </div>
+              <input
+                type="range"
+                min={1} max={26} step={1}
+                value={weeks}
+                onChange={e => setWeeks(Number(e.target.value))}
+                style={{
+                  width: '100%', accentColor: '#6366f1', cursor: 'pointer',
+                  height: 4, borderRadius: 2,
+                }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>
+                <span style={{ fontSize: 11, color: '#475569' }}>1w</span>
+                <span style={{ fontSize: 11, color: '#475569' }}>26w</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 12 }}>
+                {WEEK_PRESETS.map(value => (
                   <button
-                    key={opt.value}
-                    onClick={() => setWeeks(opt.value)}
+                    key={value}
+                    onClick={() => setWeeks(value)}
                     style={{
-                      padding: '8px 4px', borderRadius: 8, border: '1px solid',
-                      fontSize: 13, fontWeight: 500, cursor: 'pointer',
+                      padding: '6px 4px', borderRadius: 8, border: '1px solid',
+                      fontSize: 12, fontWeight: 500, cursor: 'pointer',
                       transition: 'all 0.15s ease',
-                      borderColor: weeks === opt.value ? '#6366f1' : '#1e1e2e',
-                      background: weeks === opt.value ? '#6366f115' : '#12121a',
-                      color: weeks === opt.value ? '#818cf8' : '#64748b',
-                      boxShadow: weeks === opt.value ? '0 0 12px #6366f120' : 'none',
+                      borderColor: weeks === value ? '#6366f1' : '#1e1e2e',
+                      background: weeks === value ? '#6366f115' : '#12121a',
+                      color: weeks === value ? '#818cf8' : '#64748b',
+                      boxShadow: weeks === value ? '0 0 12px #6366f120' : 'none',
                     }}
                   >
-                    {opt.label}
+                    {value}w
                   </button>
                 ))}
               </div>
@@ -478,8 +501,17 @@ export default function Home() {
   )
 }
 
+const SENTIMENT_STYLES: Record<string, { bg: string; fg: string; label: string }> = {
+  POSITIVE: { bg: '#10b98120', fg: '#10b981', label: 'POSITIVE' },
+  NEGATIVE: { bg: '#ef444420', fg: '#fca5a5', label: 'NEGATIVE' },
+  MIXED:    { bg: '#f59e0b20', fg: '#fbbf24', label: 'MIXED' },
+  NEUTRAL:  { bg: '#64748b20', fg: '#94a3b8', label: 'NEUTRAL' },
+}
+
 function ThemeCard({ theme, index }: { theme: Theme; index: number }) {
   const [expanded, setExpanded] = useState(false)
+  const [feeOpen, setFeeOpen] = useState(false)
+  const sentiment = theme.sentiment ? SENTIMENT_STYLES[theme.sentiment] : null
 
   return (
     <div
@@ -503,7 +535,7 @@ function ThemeCard({ theme, index }: { theme: Theme; index: number }) {
     >
       {/* Card Header */}
       <div style={{ padding: '20px 20px 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
           <div style={{
             fontSize: 11, fontWeight: 600, color: '#6366f1',
             background: '#6366f115', padding: '3px 10px', borderRadius: 20,
@@ -511,12 +543,23 @@ function ThemeCard({ theme, index }: { theme: Theme; index: number }) {
           }}>
             THEME {index + 1}
           </div>
-          <div style={{
-            fontSize: 12, color: '#64748b',
-            background: '#0a0a0f', padding: '3px 10px', borderRadius: 20,
-            border: '1px solid #1e1e2e',
-          }}>
-            {theme.review_count} reviews
+          <div style={{ display: 'flex', gap: 6 }}>
+            {sentiment && (
+              <div style={{
+                fontSize: 11, fontWeight: 600,
+                background: sentiment.bg, color: sentiment.fg,
+                padding: '3px 10px', borderRadius: 20, letterSpacing: 0.5,
+              }}>
+                {sentiment.label}
+              </div>
+            )}
+            <div style={{
+              fontSize: 12, color: '#64748b',
+              background: '#0a0a0f', padding: '3px 10px', borderRadius: 20,
+              border: '1px solid #1e1e2e',
+            }}>
+              {theme.review_count} reviews
+            </div>
           </div>
         </div>
         <h3 style={{ fontSize: 16, fontWeight: 700, color: '#f1f5f9', marginBottom: 8 }}>
@@ -536,6 +579,65 @@ function ThemeCard({ theme, index }: { theme: Theme; index: number }) {
         }}>
           <span style={{ fontWeight: 600, color: '#10b981' }}>✅ Action: </span>
           {theme.action}
+        </div>
+      )}
+
+      {/* Fee Explainer — click-to-expand (only when attached) */}
+      {theme.fee_explainer && (
+        <div style={{ margin: '0 20px 16px' }} onClick={e => e.stopPropagation()}>
+          <button
+            onClick={() => setFeeOpen(o => !o)}
+            style={{
+              width: '100%', padding: '10px 14px', borderRadius: 8,
+              background: '#fbbf2410', border: '1px solid #fbbf2430',
+              color: '#fcd34d', fontSize: 13, fontWeight: 500,
+              cursor: 'pointer', display: 'flex',
+              alignItems: 'center', justifyContent: 'space-between',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <span>🛈 Fee Explainer — {theme.fee_explainer.title}</span>
+            <span style={{ fontSize: 10, opacity: 0.7 }}>{feeOpen ? '▲' : '▼'}</span>
+          </button>
+          {feeOpen && (
+            <div style={{
+              marginTop: 8, padding: '14px 16px', borderRadius: 8,
+              background: '#fbbf2408', border: '1px solid #fbbf2425',
+              animation: 'fadeIn 0.2s ease both',
+            }}>
+              {theme.fee_explainer.is_stale && (
+                <div style={{
+                  display: 'inline-block', marginBottom: 10,
+                  fontSize: 11, fontWeight: 600,
+                  background: '#ef444420', color: '#fca5a5',
+                  padding: '3px 10px', borderRadius: 20,
+                }}>
+                  ⚠ Verify before sharing — facts &gt;90 days old
+                </div>
+              )}
+              <ul style={{ margin: '4px 0 10px 18px', padding: 0, color: '#e2e8f0', fontSize: 13, lineHeight: 1.65 }}>
+                {theme.fee_explainer.bullets.map((b, i) => (
+                  <li key={i} style={{ marginBottom: 4 }}>{b}</li>
+                ))}
+              </ul>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                {theme.fee_explainer.source_urls.map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                    style={{
+                      fontSize: 12, color: '#fcd34d', textDecoration: 'none',
+                      padding: '4px 10px', borderRadius: 6,
+                      background: '#fbbf2415', border: '1px solid #fbbf2430',
+                    }}
+                  >
+                    Source {i + 1} ↗
+                  </a>
+                ))}
+              </div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 10 }}>
+                Last checked: {theme.fee_explainer.last_checked}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

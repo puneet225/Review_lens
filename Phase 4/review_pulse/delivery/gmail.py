@@ -23,7 +23,14 @@ from review_pulse.store.models import AnalysisResult
 
 logger = logging.getLogger(__name__)
 
+# Declare the FULL set of scopes the app uses, not just gmail's. If we
+# declared only gmail here, the on-refresh write-back to gcp_token.json
+# would narrow the file to gmail-only and break Docs/Drive on the next
+# delivery call. Keep this list in sync with google_docs.py and
+# generate_token.py.
 SCOPES = [
+    "https://www.googleapis.com/auth/documents",
+    "https://www.googleapis.com/auth/drive.file",
     "https://www.googleapis.com/auth/gmail.send",
     "https://www.googleapis.com/auth/gmail.compose",
 ]
@@ -67,13 +74,52 @@ def _build_html_body(
         for q in theme.quotes:
             quotes_html += f'<li><em>"{q.text}"</em> — ★{q.rating} ({q.store})</li>\n'
 
+        fee_html = ""
+        fe = theme.fee_explainer
+        if fe:
+            bullets_html = "".join(f"<li>{b}</li>" for b in fe.bullets)
+            sources_html = " &middot; ".join(
+                f'<a href="{u}" style="color:#1a73e8;">Source {idx+1}</a>'
+                for idx, u in enumerate(fe.source_urls)
+            )
+            stale_badge = (
+                '<span style="background:#fce8e6;color:#d93025;padding:2px 8px;border-radius:10px;'
+                'font-size:11px;margin-left:8px;">⚠ Verify before sharing</span>' if fe.is_stale else ""
+            )
+            fee_html = f"""
+            <div style="margin-top:12px;padding:12px;background:#fffbe6;border:1px solid #fce8b2;border-radius:8px;">
+                <div style="font-weight:600;color:#7c5e00;margin-bottom:6px;">
+                    🛈 Fee Facts — {fe.title}{stale_badge}
+                </div>
+                <ul style="margin:6px 0 8px 0;padding-left:20px;color:#3c2f00;">{bullets_html}</ul>
+                <div style="font-size:12px;color:#5f6368;">
+                    {sources_html} &middot; Last checked: {fe.last_checked.isoformat()}
+                </div>
+            </div>
+            """
+
+        sentiment_chip = ""
+        if theme.sentiment:
+            colors = {
+                "POSITIVE": ("#e6f4ea", "#1e8e3e"),
+                "NEGATIVE": ("#fce8e6", "#d93025"),
+                "MIXED": ("#fef7e0", "#b06000"),
+                "NEUTRAL": ("#e8eaed", "#5f6368"),
+            }
+            bg, fg = colors.get(theme.sentiment, ("#e8eaed", "#5f6368"))
+            sentiment_chip = (
+                f'<span style="background:{bg};color:{fg};padding:2px 8px;border-radius:10px;'
+                f'font-size:11px;margin-left:8px;">{theme.sentiment}</span>'
+            )
+
         themes_html += f"""
         <div style="margin-bottom: 20px; padding: 16px; border-left: 4px solid #4285f4; background: #f8f9fa;">
-            <h3 style="margin: 0 0 8px 0; color: #1a73e8;">Theme {i}: {theme.name}</h3>
+            <h3 style="margin: 0 0 8px 0; color: #1a73e8;">Theme {i}: {theme.name}{sentiment_chip}</h3>
             <p style="margin: 4px 0; color: #5f6368;">{theme.description}</p>
             <p style="margin: 4px 0;"><strong>Reviews:</strong> {theme.review_count}</p>
             {f'<ul style="margin: 8px 0;">{quotes_html}</ul>' if quotes_html else ''}
             {f'<p style="margin: 4px 0;"><strong>✅ Action:</strong> {theme.action}</p>' if theme.action else ''}
+            {fee_html}
         </div>
         """
 

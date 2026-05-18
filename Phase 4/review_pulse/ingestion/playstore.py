@@ -11,7 +11,10 @@ import time
 from datetime import datetime
 from typing import List, Optional
 
+from collections import Counter
+
 from review_pulse.ingestion.base import BaseScraper
+from review_pulse.ingestion.quality import assess as assess_quality
 from review_pulse.store.models import Review
 
 logger = logging.getLogger(__name__)
@@ -65,6 +68,7 @@ class PlayStoreScraper(BaseScraper):
 
         all_reviews: List[Review] = []
         seen_ids: set = set()
+        rejected: Counter = Counter()
         continuation_token = None
         batch_num = 0
         hit_window_boundary = False
@@ -113,6 +117,11 @@ class PlayStoreScraper(BaseScraper):
                 body = (raw.get("content") or "").strip()
                 version = raw.get("appVersion")
 
+                verdict = assess_quality(body)
+                if not verdict.keep:
+                    rejected[verdict.reason] += 1
+                    continue
+
                 review = Review(
                     source="playstore",
                     product=self.product,
@@ -138,6 +147,13 @@ class PlayStoreScraper(BaseScraper):
             # Polite delay to avoid rate limiting
             time.sleep(_BATCH_DELAY_SECONDS)
 
+        if rejected:
+            logger.info(
+                "🧹 Play Store: filtered out %d low-quality reviews for %s (%s)",
+                sum(rejected.values()),
+                self.product,
+                ", ".join(f"{r}={n}" for r, n in rejected.most_common()),
+            )
         logger.info(
             "✅ Play Store: fetched %d reviews for %s (batches=%d)",
             len(all_reviews),

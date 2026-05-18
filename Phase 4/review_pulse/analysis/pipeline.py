@@ -20,10 +20,11 @@ Entry point: run_analysis(reviews, config) -> AnalysisResult
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Optional
 
 from review_pulse.agent.config import AnalysisConfig
 from review_pulse.analysis.fallback import run_fallback
+from review_pulse.analysis.fee_explainer import enrich_themes
 from review_pulse.analysis.validator import validate_quotes
 from review_pulse.store.models import AnalysisResult, Review, Theme
 
@@ -68,6 +69,7 @@ class AnalysisError(Exception):
 def run_analysis(
     reviews: List[Review],
     config: AnalysisConfig,
+    product: Optional[str] = None,
 ) -> AnalysisResult:
     """
     Run the full analysis pipeline for a list of ingested reviews.
@@ -75,6 +77,8 @@ def run_analysis(
     Args:
         reviews: Deduplicated, PII-scrubbed reviews from ingestion pipeline.
         config: Analysis configuration (model names, UMAP/HDBSCAN params, LLM settings).
+        product: Product slug, used to look up data/fee_facts/{product}.yaml for
+            the Fee Explainer enrichment. If None, fee enrichment is skipped.
 
     Returns:
         AnalysisResult with themes, quotes, and metadata.
@@ -189,6 +193,7 @@ def run_analysis(
             reviews=cluster_review_list,
             model_name=config.llm_model,
             token_budget_remaining=tokens_remaining,
+            existing_theme_names=[t.name for t in themes],
         )
 
         tokens_remaining -= summary.tokens_used
@@ -207,11 +212,21 @@ def run_analysis(
             Theme(
                 name=summary.name,
                 description=summary.description,
+                sentiment=summary.sentiment,
                 quotes=validated_quotes,
                 action=summary.action,
                 review_count=len(cluster_review_list),
             )
         )
+
+    # -----------------------------------------------------------------------
+    # STEP 6: Fee Explainer enrichment (curated, never LLM-generated text)
+    # -----------------------------------------------------------------------
+    if product:
+        try:
+            enrich_themes(themes, product)
+        except Exception as exc:
+            logger.warning("Fee explainer enrichment failed (%s) — continuing without it", exc)
 
     logger.info(
         "Analysis complete: %d themes, %d total tokens, fallback=%s, partial=%s",

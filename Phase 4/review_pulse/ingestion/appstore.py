@@ -10,7 +10,10 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
+from collections import Counter
+
 from review_pulse.ingestion.base import BaseScraper
+from review_pulse.ingestion.quality import assess as assess_quality
 from review_pulse.store.models import Review
 
 logger = logging.getLogger(__name__)
@@ -56,6 +59,7 @@ class AppStoreScraper(BaseScraper):
 
         reviews: List[Review] = []
         seen_ids: set = set()
+        rejected: Counter = Counter()
 
         try:
             entry = AppStoreEntry(app_id=int(self.app_id), country=self.country)
@@ -89,6 +93,13 @@ class AppStoreScraper(BaseScraper):
                 body = (raw.get("review") or raw.get("body") or "").strip()
                 version = raw.get("version")
 
+                # App Store reviews can carry signal in the title even when the
+                # body is sparse, so assess the combined text.
+                verdict = assess_quality(f"{title or ''} {body}".strip())
+                if not verdict.keep:
+                    rejected[verdict.reason] += 1
+                    continue
+
                 review = Review(
                     source="appstore",
                     product=self.product,
@@ -106,6 +117,13 @@ class AppStoreScraper(BaseScraper):
             logger.warning("App Store scraper failed: %s", exc, exc_info=True)
             return reviews  # Return partial results
 
+        if rejected:
+            logger.info(
+                "🧹 App Store: filtered out %d low-quality reviews for %s (%s)",
+                sum(rejected.values()),
+                self.product,
+                ", ".join(f"{r}={n}" for r, n in rejected.most_common()),
+            )
         logger.info("✅ App Store: fetched %d reviews for %s", len(reviews), self.product)
         return reviews
 
