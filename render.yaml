@@ -3,9 +3,10 @@ services:
   - type: web
     name: review-pulse-api
     runtime: python
-    rootDir: Phase 3
+    rootDir: Phase 4
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
+    plan: starter
     envVars:
       - key: GEMINI_API_KEY
         sync: false
@@ -13,6 +14,13 @@ services:
         sync: false
       - key: GOOGLE_OAUTH_TOKEN_B64
         sync: false
+      - key: CORS_ALLOWED_ORIGINS
+        # Set to your Vercel URL after frontend deploys (e.g.
+        # "https://review-lens.vercel.app"). Comma-separated for multiple.
+        # Default "*" stays open until you fill this in.
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11.9"
       - key: PYTHONPATH
         value: .
     healthCheckPath: /api/health

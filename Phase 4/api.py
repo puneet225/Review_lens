@@ -51,12 +51,17 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors_env = os.environ.get("CORS_ALLOWED_ORIGINS", "*").strip()
+_allow_origins = (
+    ["*"] if _cors_env in ("", "*") else [o.strip() for o in _cors_env.split(",") if o.strip()]
+)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+logger.info("CORS allow_origins=%s", _allow_origins)
 
 
 # ── Request / Response models ──────────────────────────────────────────────
@@ -92,7 +97,7 @@ async def _run_pipeline(job_id: str, product: str, weeks: int, max_reviews: int)
 
         from review_pulse.agent.config import load_config
         from review_pulse.agent.orchestrator import Orchestrator
-        from review_pulse.store.run_log import RunLogStore
+        from review_pulse.store.run_log import RunLog
 
         # Override config values via env for this run
         config_path = Path(__file__).parent / "config.yaml"
@@ -102,8 +107,8 @@ async def _run_pipeline(job_id: str, product: str, weeks: int, max_reviews: int)
         config.ingestion.__dict__["max_reviews_per_source"] = max_reviews
         config.ingestion.__dict__["window_weeks"] = weeks
 
-        run_log = RunLogStore()
-        await run_log.init()
+        run_log = RunLog()
+        await run_log.init_db()
 
         iso_week = datetime.utcnow().strftime("%G-W%V")
         orchestrator = Orchestrator(config=config, run_log=run_log)
@@ -144,15 +149,26 @@ def _extract_themes(orchestrator) -> List[Dict]:
         return []
     themes = []
     for t in analysis.themes:
+        fee = None
+        if t.fee_explainer:
+            fee = {
+                "title": t.fee_explainer.title,
+                "bullets": list(t.fee_explainer.bullets),
+                "source_urls": [str(u) for u in t.fee_explainer.source_urls],
+                "last_checked": t.fee_explainer.last_checked.isoformat(),
+                "is_stale": t.fee_explainer.is_stale,
+            }
         themes.append({
             "name": t.name,
             "description": t.description,
+            "sentiment": t.sentiment,
             "review_count": t.review_count,
             "action": t.action,
             "quotes": [
                 {"text": q.text, "rating": q.rating, "store": q.store}
                 for q in t.quotes
             ],
+            "fee_explainer": fee,
         })
     return themes
 
