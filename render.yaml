@@ -6,7 +6,7 @@ services:
     rootDir: Phase 4
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api:app --host 0.0.0.0 --port $PORT
-    plan: starter
+    plan: free
     envVars:
       - key: GEMINI_API_KEY
         sync: false
