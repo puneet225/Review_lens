@@ -69,6 +69,7 @@ class AnalysisConfig(BaseModel):
     llm_model: str = Field("gemini-2.5-flash", description="LLM model identifier")
     max_tokens_per_run: int = Field(50_000, ge=100, le=500_000)
     max_themes: int = Field(8, ge=1, le=20)
+    category_match_threshold: float = Field(0.30, ge=0.0, le=1.0, description="Min cosine sim to assign a review to a fixed category; below → Other")
 
 
 class DeliveryConfig(BaseModel):

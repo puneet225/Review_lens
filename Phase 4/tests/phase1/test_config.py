@@ -134,3 +134,9 @@ class TestConfigLoading:
         _write_yaml(data, tmp_path / "config.yaml")
         with pytest.raises(ValidationError, match="at least one"):
             load_config(tmp_path / "config.yaml")
+
+
+def test_analysis_config_has_category_threshold_default():
+    from review_pulse.agent.config import AnalysisConfig
+    cfg = AnalysisConfig()
+    assert cfg.category_match_threshold == 0.30
