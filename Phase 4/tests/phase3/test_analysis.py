@@ -336,115 +336,64 @@ class TestAnalysisPipeline:
     def test_fallback_when_embedding_fails(self) -> None:
         reviews = _make_reviews(20)
         config = _make_analysis_config()
-
-        # Patch where the function is imported inside the pipeline try/except block
         with patch("review_pulse.analysis.pipeline.generate_embeddings", side_effect=ImportError("no lib")):
             result = run_analysis(reviews, config)
-
-        assert isinstance(result, AnalysisResult)
         assert result.fallback_used is True
         assert result.total_reviews == 20
 
-    def test_fallback_when_umap_fails(self) -> None:
+    def test_fallback_when_classification_fails(self) -> None:
         reviews = _make_reviews(20)
         config = _make_analysis_config()
         fake_embeddings = np.random.rand(20, 384).astype(np.float32)
-
         with patch("review_pulse.analysis.pipeline.generate_embeddings", return_value=fake_embeddings), \
-             patch("review_pulse.analysis.pipeline.reduce_dimensions", side_effect=ImportError("no umap")):
+             patch("review_pulse.analysis.pipeline.group_by_category", side_effect=ImportError("no classifier")):
             result = run_analysis(reviews, config)
-
         assert result.fallback_used is True
 
-    def test_fallback_when_all_noise(self) -> None:
+    def test_full_pipeline_uses_fixed_category_names(self) -> None:
         reviews = _make_reviews(20)
         config = _make_analysis_config()
         fake_embeddings = np.random.rand(20, 384).astype(np.float32)
-        fake_reduced = np.random.rand(20, 5).astype(np.float32)
 
-        mock_cluster_result = MagicMock()
-        mock_cluster_result.is_all_noise = True
-        mock_cluster_result.noise_count = 20
-        mock_cluster_result.clusters = {-1: reviews}
-
-        # Patch all lazy-imported symbols
-        with patch("review_pulse.analysis.pipeline.generate_embeddings", return_value=fake_embeddings), \
-             patch("review_pulse.analysis.pipeline.reduce_dimensions", return_value=fake_reduced), \
-             patch("review_pulse.analysis.pipeline.cluster_reviews", return_value=mock_cluster_result):
-            result = run_analysis(reviews, config)
-
-        assert result.fallback_used is True
-
-    def test_full_pipeline_with_mocked_llm(self) -> None:
-        """Happy path: embedding + clustering + LLM summarisation works end-to-end."""
-        reviews = _make_reviews(20)
-        config = _make_analysis_config()
-
-        fake_embeddings = np.random.rand(20, 384).astype(np.float32)
-        fake_reduced = np.random.rand(20, 5).astype(np.float32)
-
-        mock_cluster_result = MagicMock()
-        mock_cluster_result.is_all_noise = False
-        mock_cluster_result.noise_count = 2
-        cluster0 = reviews[:10]
-        cluster1 = reviews[10:]
-        mock_cluster_result.clusters = {0: cluster0, 1: cluster1}
+        grouped = {"loved": reviews[:8], "bugs": reviews[8:16], "other": reviews[16:]}
 
         from review_pulse.analysis.summariser import SummaryResult
 
-        # Build summaries with quotes that ARE real substrings
-        def fake_summarise(cluster_id, reviews, **kwargs):
-            sample_body = reviews[0].body
-            # Use a real substring from the review body
-            quote = sample_body[4:40] if len(sample_body) > 40 else sample_body
-            return SummaryResult(
-                cluster_id=cluster_id,
-                name=f"Theme {cluster_id}",
-                description="A real theme",
-                raw_quotes=[quote],
-                action="Fix this issue",
-                tokens_used=500,
-            )
+        def fake_summarise(reviews, fixed_name, **kwargs):
+            body = reviews[0].body
+            quote = body[4:40] if len(body) > 40 else body
+            return SummaryResult(name=fixed_name, description="desc",
+                                 raw_quotes=[quote], action="Fix it", tokens_used=300)
 
         with patch("review_pulse.analysis.pipeline.generate_embeddings", return_value=fake_embeddings), \
-             patch("review_pulse.analysis.pipeline.reduce_dimensions", return_value=fake_reduced), \
-             patch("review_pulse.analysis.pipeline.cluster_reviews", return_value=mock_cluster_result), \
+             patch("review_pulse.analysis.pipeline.group_by_category", return_value=grouped), \
              patch("review_pulse.analysis.pipeline.summarise_cluster", side_effect=fake_summarise):
-            result = run_analysis(reviews, config)
+            result = run_analysis(reviews, config, product=None)
 
-        assert isinstance(result, AnalysisResult)
         assert result.fallback_used is False
-        assert len(result.themes) == 2
-        assert result.total_reviews == 20
-        assert result.tokens_used == 1000  # 2 clusters × 500
+        names = [t.name for t in result.themes]
+        assert "💚 What Users Love" in names
+        assert "⚡ App Problems & Bugs" in names
+        # noise_count == size of the 'other' bucket
+        assert result.noise_count == 4
+        # 'Other' is summarised last, behind the two real categories sorted by size
+        assert result.themes[0].review_count >= result.themes[1].review_count
+        assert result.themes[-1].name == "📦 Other"
+        assert result.themes[0].category_key in {"loved", "bugs"}
 
     def test_token_budget_enforced(self) -> None:
-        """With a tiny token budget, only the first cluster is processed."""
         reviews = _make_reviews(20)
-        config = _make_analysis_config(max_tokens_per_run=100)  # tiny budget
-
+        config = _make_analysis_config(max_tokens_per_run=100)
         fake_embeddings = np.random.rand(20, 384).astype(np.float32)
-        fake_reduced = np.random.rand(20, 5).astype(np.float32)
-
-        mock_cluster_result = MagicMock()
-        mock_cluster_result.is_all_noise = False
-        mock_cluster_result.noise_count = 0
-        mock_cluster_result.clusters = {0: reviews[:5], 1: reviews[5:10], 2: reviews[10:]}
+        grouped = {"loved": reviews[:7], "bugs": reviews[7:14], "fees": reviews[14:]}
 
         from review_pulse.analysis.summariser import SummaryResult
 
-        def fake_summarise_heavy(cluster_id, reviews, **kwargs):
-            return SummaryResult(
-                cluster_id=cluster_id,
-                name=f"Theme {cluster_id}",
-                raw_quotes=[],
-                tokens_used=200,  # Each call costs 200 tokens
-            )
+        def fake_summarise_heavy(reviews, fixed_name, **kwargs):
+            return SummaryResult(name=fixed_name, raw_quotes=[], tokens_used=200)
 
         with patch("review_pulse.analysis.pipeline.generate_embeddings", return_value=fake_embeddings), \
-             patch("review_pulse.analysis.pipeline.reduce_dimensions", return_value=fake_reduced), \
-             patch("review_pulse.analysis.pipeline.cluster_reviews", return_value=mock_cluster_result), \
+             patch("review_pulse.analysis.pipeline.group_by_category", return_value=grouped), \
              patch("review_pulse.analysis.pipeline.summarise_cluster", side_effect=fake_summarise_heavy):
             result = run_analysis(reviews, config)
-
         assert result.is_partial is True

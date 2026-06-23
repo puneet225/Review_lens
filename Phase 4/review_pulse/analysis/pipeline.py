@@ -56,6 +56,15 @@ except Exception:
     def summarise_cluster(*a, **k):  # type: ignore[misc]
         raise ImportError("google-generativeai not installed")
 
+try:
+    from review_pulse.analysis.classifier import group_by_category, display_name_for, OTHER_KEY
+except Exception:
+    OTHER_KEY = "other"
+    def display_name_for(key):  # type: ignore[misc]
+        return key
+    def group_by_category(*a, **k):  # type: ignore[misc]
+        raise ImportError("classifier unavailable")
+
 logger = logging.getLogger(__name__)
 
 # Minimum reviews required to attempt embedding + clustering
@@ -106,116 +115,77 @@ def run_analysis(
         )
 
     # -----------------------------------------------------------------------
-    # STEP 2: UMAP dimensionality reduction
+    # STEP 2: Classify reviews into the fixed category taxonomy
     # -----------------------------------------------------------------------
-    reduced = None
-    if total_reviews >= _MIN_REVIEWS_FOR_CLUSTERING:
-        try:
-            reduced = reduce_dimensions(
-                embeddings,
-                n_components=config.umap_n_components,
-                n_neighbors=config.umap_n_neighbors,
-                min_dist=config.umap_min_dist,
-                metric=config.umap_metric,
-            )
-        except (ImportError, Exception) as exc:
-            logger.warning("UMAP step failed (%s) — will skip to fallback", exc)
-    else:
-        logger.info(
-            "Only %d reviews — skipping UMAP/HDBSCAN (need ≥ %d)",
-            total_reviews,
-            _MIN_REVIEWS_FOR_CLUSTERING,
+    grouped: dict = {}
+    try:
+        grouped = group_by_category(
+            reviews,
+            embeddings,
+            model_name=config.embedding_model,
+            threshold=config.category_match_threshold,
         )
+    except (ImportError, Exception) as exc:
+        logger.warning("Classification failed (%s) — activating TF-IDF fallback", exc)
 
-    # -----------------------------------------------------------------------
-    # STEP 3: HDBSCAN clustering
-    # -----------------------------------------------------------------------
-    cluster_map: dict = {}
-    fallback_used = False
-    noise_count = 0
-
-    if reduced is not None:
-        try:
-            clustering_result = cluster_reviews(
-                reduced,
-                reviews,
-                min_cluster_size=config.hdbscan_min_cluster_size,
-                min_samples=config.hdbscan_min_samples,
-            )
-            noise_count = clustering_result.noise_count
-
-            if clustering_result.is_all_noise:
-                logger.warning("HDBSCAN found no clusters — all noise. Activating fallback.")
-                fallback_used = True
-            else:
-                cluster_map = {k: v for k, v in clustering_result.clusters.items() if k != -1}
-                logger.info("Using %d HDBSCAN clusters for LLM summarisation", len(cluster_map))
-        except (ImportError, Exception) as exc:
-            logger.warning("HDBSCAN step failed (%s) — activating fallback", exc)
-            fallback_used = True
-    else:
-        fallback_used = True
-
-    # -----------------------------------------------------------------------
-    # STEP 4a: Fallback (TF-IDF)
-    # -----------------------------------------------------------------------
-    if fallback_used or not cluster_map:
+    if not grouped:
         themes, _ = run_fallback(reviews, max_themes=config.max_themes)
         return AnalysisResult(
             themes=themes,
             total_reviews=total_reviews,
-            noise_count=noise_count,
+            noise_count=0,
             tokens_used=0,
             fallback_used=True,
         )
 
-    # -----------------------------------------------------------------------
-    # STEP 4b: LLM summarisation per cluster
-    # -----------------------------------------------------------------------
+    noise_count = len(grouped.get(OTHER_KEY, []))
 
-    # Sort clusters by size descending, take top max_themes
-    sorted_clusters = sorted(cluster_map.items(), key=lambda kv: len(kv[1]), reverse=True)
-    top_clusters = sorted_clusters[: config.max_themes]
+    # Order: real categories by size desc, then Other last.
+    non_other = [(k, v) for k, v in grouped.items() if k != OTHER_KEY]
+    non_other.sort(key=lambda kv: len(kv[1]), reverse=True)
+    ordered = non_other + ([(OTHER_KEY, grouped[OTHER_KEY])] if OTHER_KEY in grouped else [])
+    top_categories = ordered[: config.max_themes]
 
+    # -----------------------------------------------------------------------
+    # STEP 3: LLM summarisation per category
+    # -----------------------------------------------------------------------
     themes: List[Theme] = []
     total_tokens = 0
     tokens_remaining = config.max_tokens_per_run
     is_partial = False
 
-    for cluster_id, cluster_review_list in top_clusters:
+    for category_key, category_reviews in top_categories:
         if tokens_remaining <= 0:
             logger.warning("Token budget exhausted after %d themes", len(themes))
             is_partial = True
             break
 
+        display_name = display_name_for(category_key)
         summary = summarise_cluster(
-            cluster_id=cluster_id,
-            reviews=cluster_review_list,
+            reviews=category_reviews,
+            fixed_name=display_name,
             model_name=config.llm_model,
             token_budget_remaining=tokens_remaining,
-            existing_theme_names=[t.name for t in themes],
         )
 
         tokens_remaining -= summary.tokens_used
         total_tokens += summary.tokens_used
 
-        # -------------------------------------------------------------------
-        # STEP 5: Quote validation
-        # -------------------------------------------------------------------
         validated_quotes = validate_quotes(
             raw_quotes=summary.raw_quotes,
-            reviews=cluster_review_list,
+            reviews=category_reviews,
             max_quotes=3,
         )
 
         themes.append(
             Theme(
-                name=summary.name,
+                name=display_name,
                 description=summary.description,
                 sentiment=summary.sentiment,
                 quotes=validated_quotes,
                 action=summary.action,
-                review_count=len(cluster_review_list),
+                review_count=len(category_reviews),
+                category_key=category_key,
             )
         )
 
@@ -232,7 +202,7 @@ def run_analysis(
         "Analysis complete: %d themes, %d total tokens, fallback=%s, partial=%s",
         len(themes),
         total_tokens,
-        fallback_used,
+        False,
         is_partial,
     )
 
