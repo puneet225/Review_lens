@@ -84,7 +84,7 @@ def _get_groq_keys() -> List[str]:
 class SummaryResult:
     """Raw output from the LLM for one cluster."""
 
-    name: str = "Unknown Theme"
+    name: str = ""
     description: str = ""
     sentiment: Optional[str] = None
     raw_quotes: List[str] = field(default_factory=list)
