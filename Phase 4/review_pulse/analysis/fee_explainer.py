@@ -26,6 +26,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from review_pulse.analysis.classifier import OTHER_KEY
 from review_pulse.store.models import FeeExplainer, Theme
 
 logger = logging.getLogger(__name__)
@@ -317,6 +318,15 @@ def enrich_themes(themes: List[Theme], product: str) -> List[Theme]:
         return themes
 
     for theme in themes:
+        # Category gate: the residual Other bucket is a grab-bag of unclassified
+        # reviews and must never receive curated fee guidance, even if its text
+        # happens to be semantically close to the fee corpus.
+        if theme.category_key == OTHER_KEY:
+            logger.debug(
+                "Theme %r: category_key=%r is the Other bucket — skipping fee explainer",
+                theme.name, OTHER_KEY,
+            )
+            continue
         # Sentiment gate: confusion themes only.
         if theme.sentiment not in _GATED_SENTIMENTS:
             logger.debug(
