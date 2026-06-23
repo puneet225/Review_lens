@@ -38,42 +38,39 @@ def _get_model(model_name: str) -> "_STModel":
     return _MODEL_CACHE
 
 
-def generate_embeddings(
-    reviews: List[Review],
+def embed_texts(
+    texts: List[str],
     model_name: str = "all-MiniLM-L6-v2",
     batch_size: int = 64,
-) -> np.ndarray:
-    """
-    Generate sentence embeddings for a list of reviews.
-
-    Args:
-        reviews: List of Review objects (uses .body for embedding).
-        model_name: SentenceTransformer model identifier.
-        batch_size: Encoding batch size.
-
-    Returns:
-        Float32 numpy array of shape (len(reviews), embedding_dim).
-
-    Raises:
-        ValueError: If reviews list is empty.
-        ImportError: If sentence-transformers is not installed.
-    """
-    if not reviews:
-        raise ValueError("Cannot generate embeddings for an empty review list")
+) -> "np.ndarray":
+    """Embed a list of raw strings into unit-normalised float32 vectors."""
+    if not texts:
+        raise ValueError("Cannot embed an empty text list")
 
     import numpy as np
 
-    texts = [r.body.strip() or r.title or "no content" for r in reviews]
     model = _get_model(model_name)
-
-    logger.info("Encoding %d reviews (batch_size=%d)...", len(texts), batch_size)
-    embeddings: np.ndarray = model.encode(
+    embeddings = model.encode(
         texts,
         batch_size=batch_size,
         show_progress_bar=False,
         convert_to_numpy=True,
         normalize_embeddings=True,  # unit-norm for cosine similarity
     )
-
-    logger.info("Embeddings shape: %s", embeddings.shape)
     return embeddings.astype(np.float32)
+
+
+def generate_embeddings(
+    reviews: List[Review],
+    model_name: str = "all-MiniLM-L6-v2",
+    batch_size: int = 64,
+) -> "np.ndarray":
+    """Generate sentence embeddings for a list of reviews (uses .body)."""
+    if not reviews:
+        raise ValueError("Cannot generate embeddings for an empty review list")
+
+    texts = [r.body.strip() or r.title or "no content" for r in reviews]
+    logger.info("Encoding %d reviews (batch_size=%d)...", len(texts), batch_size)
+    embeddings = embed_texts(texts, model_name=model_name, batch_size=batch_size)
+    logger.info("Embeddings shape: %s", embeddings.shape)
+    return embeddings
