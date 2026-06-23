@@ -39,18 +39,6 @@ except Exception:
         raise ImportError("sentence-transformers not installed")
 
 try:
-    from review_pulse.analysis.reducer import reduce_dimensions
-except Exception:
-    def reduce_dimensions(*a, **k):  # type: ignore[misc]
-        raise ImportError("umap-learn not installed")
-
-try:
-    from review_pulse.analysis.clusterer import cluster_reviews
-except Exception:
-    def cluster_reviews(*a, **k):  # type: ignore[misc]
-        raise ImportError("hdbscan not installed")
-
-try:
     from review_pulse.analysis.summariser import summarise_cluster
 except Exception:
     def summarise_cluster(*a, **k):  # type: ignore[misc]
@@ -66,9 +54,6 @@ except Exception:
         raise ImportError("classifier unavailable")
 
 logger = logging.getLogger(__name__)
-
-# Minimum reviews required to attempt embedding + clustering
-_MIN_REVIEWS_FOR_CLUSTERING = 10
 
 
 class AnalysisError(Exception):

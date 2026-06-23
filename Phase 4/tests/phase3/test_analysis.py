@@ -397,3 +397,4 @@ class TestAnalysisPipeline:
              patch("review_pulse.analysis.pipeline.summarise_cluster", side_effect=fake_summarise_heavy):
             result = run_analysis(reviews, config)
         assert result.is_partial is True
+        assert len(result.themes) == 1
