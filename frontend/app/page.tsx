@@ -457,13 +457,12 @@ export default function Home() {
           {/* Stats bar */}
           {isDone && job.stats && (
             <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16,
+              display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16,
               marginBottom: 32,
             }}>
               {[
                 { label: 'Reviews Analyzed', value: job.stats.reviews.toLocaleString(), icon: '📱', color: '#6366f1' },
                 { label: 'Themes Identified', value: job.stats.themes, icon: '🔍', color: '#10b981' },
-                { label: 'Tokens Used', value: job.stats.tokens.toLocaleString(), icon: '⚡', color: '#f59e0b' },
               ].map(stat => (
                 <div key={stat.label} style={{
                   padding: '20px 24px', borderRadius: 14, border: '1px solid #1e1e2e',
