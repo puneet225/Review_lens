@@ -107,6 +107,12 @@ class TestThemeModel:
         assert t.name == "App crashes"
         assert len(t.quotes) == 1
 
+    def test_theme_category_key_defaults_none_and_accepts_value(self) -> None:
+        t = Theme(name="💸 Fees & Charges")
+        assert t.category_key is None
+        t2 = Theme(name="💸 Fees & Charges", category_key="fees")
+        assert t2.category_key == "fees"
+
     def test_analysis_result_defaults(self) -> None:
         ar = AnalysisResult()
         assert ar.themes == []

@@ -113,6 +113,7 @@ class Theme(BaseModel):
     quotes: List[ValidatedQuote] = Field(default_factory=list, description="2–3 validated quotes")
     action: Optional[str] = Field(None, description="One actionable recommendation, or None for NEUTRAL clusters")
     review_count: int = Field(0, ge=0, description="Number of reviews in this cluster")
+    category_key: Optional[str] = Field(None, description="Stable category key (e.g. 'fees'); None for fallback themes")
     fee_explainer: Optional[FeeExplainer] = Field(None, description="Attached when theme matches a curated fee topic")
 
 
