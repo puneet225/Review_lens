@@ -89,8 +89,7 @@ def test_group_by_category_embeds_seeds_then_classifies():
         np.array([0.0, 1.0]),  # account
     ]
 
-    with patch.object(classifier, "embed_texts", create=True, side_effect=fake_embed_texts), \
-         patch("review_pulse.analysis.embedder.embed_texts", side_effect=fake_embed_texts):
+    with patch.object(classifier, "embed_texts", side_effect=fake_embed_texts):
         grouped = classifier.group_by_category(reviews, review_emb, model_name="x", threshold=0.3)
 
     assert grouped["loved"][0].review_id == "r0"

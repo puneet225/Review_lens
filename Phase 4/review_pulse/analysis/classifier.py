@@ -96,7 +96,8 @@ def classify_reviews(
 try:
     from review_pulse.analysis.embedder import embed_texts
 except ImportError:  # pragma: no cover
-    embed_texts = None  # type: ignore[assignment]
+    def embed_texts(*a, **k):  # type: ignore[misc]
+        raise ImportError("sentence-transformers not installed")
 
 
 def group_by_category(
