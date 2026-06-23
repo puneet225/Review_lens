@@ -160,6 +160,7 @@ def _extract_themes(orchestrator) -> List[Dict]:
             }
         themes.append({
             "name": t.name,
+            "category_key": t.category_key,
             "description": t.description,
             "sentiment": t.sentiment,
             "review_count": t.review_count,
