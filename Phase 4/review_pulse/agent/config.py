@@ -101,7 +101,8 @@ class AppConfig(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
+        frozen=True,
     )
 
     products: List[ProductConfig] = Field(..., min_length=1, description="At least one product required")
@@ -139,7 +140,26 @@ _DEFAULT_CONFIG_PATH = "config.yaml"
 
 
 def _apply_env_overrides(raw: Dict) -> Dict:
-    """Apply manual overrides if needed (BaseSettings handles .env and process env)."""
+    """Apply environment variable overrides to the raw config dict.
+
+    load_config() validates via model_validate(raw), which bypasses
+    pydantic-settings' own env sources, so these overrides are applied
+    explicitly here before validation.
+
+    Supported overrides:
+        REVIEW_PULSE_LLM_MODEL     → analysis.llm_model
+        REVIEW_PULSE_DELIVERY_MODE → delivery.mode
+        REVIEW_PULSE_WINDOW_WEEKS  → ingestion.window_weeks
+    """
+    env_map = {
+        "REVIEW_PULSE_LLM_MODEL": ("analysis", "llm_model"),
+        "REVIEW_PULSE_DELIVERY_MODE": ("delivery", "mode"),
+        "REVIEW_PULSE_WINDOW_WEEKS": ("ingestion", "window_weeks"),
+    }
+    for env_key, (section, field) in env_map.items():
+        val = os.environ.get(env_key)
+        if val is not None:
+            raw.setdefault(section, {})[field] = val
     return raw
 
 
