@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react'
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// Strip any trailing slash(es) so a value like "https://host/" doesn't
+// produce double-slash URLs ("host//api/...") that 404 on the backend.
+const API = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
 
 type Quote = { text: string; rating: number; store: string }
 type FeeExplainer = {
